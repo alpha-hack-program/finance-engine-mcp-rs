@@ -1069,21 +1069,17 @@ impl ServerHandler for FinanceEngine {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Finance Engine providing eleven calculation functions for financial analysis and business intelligence:\
-                 \n\n**Tier 1 (Critical Business Metrics)**\
-                 \n1. calculate_company_health_score - Comprehensive 0-100 health score combining revenue growth, Service Level Agreement compliance, modern revenue percentage, customer satisfaction, and pipeline coverage\
+                "Finance Engine providing seven calculation functions for financial analysis and business intelligence:\
+                 \n\n**Critical Business Metrics**\
+                 \n1. calculate_company_health_score - Comprehensive 0-100 health score combining five weighted dimensions: revenue growth (30%), SLA compliance (25%), modern revenue percentage (20%), customer satisfaction (15%), and pipeline coverage (10%)\
                  \n2. calculate_revenue_quality_score - Revenue quality evaluation with high-growth, stable, and declining categorization\
                  \n3. calculate_hhi_and_diversification - Herfindahl-Hirschman Index for revenue concentration risk assessment\
-                 \n\n**Tier 2 (Strategic Planning Metrics)**\
-                 \n4. calculate_support_efficiency_score - Support operations performance combining resolution efficiency and SLA compliance\
-                 \n5. calculate_growth_attribution - Growth attribution to individual segments showing drivers and drags\
-                 \n6. calculate_segment_growth_analysis - Modern vs traditional product growth comparison\
-                 \n\n**Tier 3 (Enterprise Metrics)**\
-                 \n7. calculate_operating_leverage - Operating leverage ratio measuring revenue growth vs cost growth for scalability assessment\
-                 \n8. calculate_portfolio_momentum - Revenue-weighted portfolio momentum index showing aggregate growth trajectory\
-                 \n9. calculate_gini_coefficient - Gini coefficient for revenue concentration and diversification risk analysis\
-                 \n10. calculate_lifecycle_weighted_growth - Lifecycle-weighted growth rate categorizing segments by maturity stage\
-                 \n11. calculate_organic_growth - Year-over-year organic revenue growth excluding inorganic factors\
+                 \n\n**Operational Metrics**\
+                 \n4. calculate_operating_leverage - Operating leverage ratio measuring revenue growth vs cost growth for scalability assessment\
+                 \n\n**Portfolio Analytics**\
+                 \n5. calculate_portfolio_momentum - Revenue-weighted portfolio momentum index showing aggregate growth trajectory\
+                 \n6. calculate_gini_coefficient - Gini coefficient for revenue concentration and diversification risk analysis\
+                 \n7. calculate_organic_growth - Year-over-year organic revenue growth excluding inorganic factors\
                  \n\nAll functions perform sophisticated multi-step calculations with comprehensive validation.".into()
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),

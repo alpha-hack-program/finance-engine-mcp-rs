@@ -176,86 +176,7 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 
 ---
 
-### Function 4: calculate_support_efficiency_score
-
-**Purpose:** Measures support operations efficiency combining resolution and SLA metrics.
-
-**Composition:**
-- Resolution efficiency (40%): FCR (70%) + Time improvement (30%)
-- SLA compliance (60%)
-
-**Example:**
-```json
-{
-  "fcr_current": 0.72,
-  "fcr_prior": 0.68,
-  "handling_time_current": 3.8,
-  "handling_time_prior": 4.2,
-  "sla_compliance": 0.985
-}
-```
-
-**Returns:**
-- Overall score (0-100)
-- Component scores
-- Performance grade (A-F)
-- Year-over-year efficiency gains
-- Component contributions
-
----
-
-### Function 5: calculate_growth_attribution
-
-**Purpose:** Attributes total growth to individual segments, identifying drivers and drags.
-
-**Example:**
-```json
-{
-  "segments": {
-    "subscription": {"fy2024": 12.5, "fy2025": 15.0},
-    "enterprise": {"fy2024": 22.0, "fy2025": 25.0}
-  }
-}
-```
-
-**Returns:**
-- Total growth dollars
-- Per-segment contributions (dollar, percentage, growth rate)
-- Growth drivers (sorted descending)
-- Growth drags (sorted ascending)
-- Verification (sum = 100%)
-
----
-
-### Function 6: calculate_segment_growth_analysis
-
-**Purpose:** Compares modern vs traditional product growth to assess portfolio transformation.
-
-**Interpretation:**
-- Ratio > 3.0: Transformation successful
-- Ratio 1.0-3.0: Transformation progressing
-- Ratio < 1.0: Transformation failing
-
-**Example:**
-```json
-{
-  "modern_fy2024": 12.5,
-  "modern_fy2025": 15.0,
-  "traditional_fy2024": 37.5,
-  "traditional_fy2025": 38.0
-}
-```
-
-**Returns:**
-- Modern growth rate
-- Traditional growth rate
-- Growth rate ratio
-- Dollar gains by segment
-- Transformation interpretation
-
----
-
-### Function 7: calculate_operating_leverage
+### Function 4: calculate_operating_leverage
 
 **Purpose:** Measures relationship between revenue growth and cost growth to assess operational scalability.
 
@@ -284,7 +205,7 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 
 ---
 
-### Function 8: calculate_portfolio_momentum
+### Function 5: calculate_portfolio_momentum
 
 **Purpose:** Calculates revenue-weighted growth rate across business segments to measure overall portfolio momentum.
 
@@ -317,7 +238,7 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 
 ---
 
-### Function 9: calculate_gini_coefficient
+### Function 6: calculate_gini_coefficient
 
 **Purpose:** Measures revenue distribution inequality using Gini coefficient for concentration risk assessment.
 
@@ -345,41 +266,7 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 
 ---
 
-### Function 10: calculate_lifecycle_weighted_growth
-
-**Purpose:** Calculates weighted growth rate by categorizing segments into lifecycle stages.
-
-**Lifecycle Stages:**
-- High Growth: growth > 15%
-- Mature: growth 0% - 15%
-- Declining: growth < 0%
-
-**Portfolio Quality Ratings:**
-- Excellent: >40% high growth, <20% declining
-- Good: >30% high growth, <25% declining
-- Fair: >20% high growth
-- Poor: <20% high growth
-
-**Example:**
-```json
-{
-  "segments": {
-    "subscription": {"revenue": 15.0, "growth_rate": 0.20},
-    "enterprise": {"revenue": 25.0, "growth_rate": 0.14},
-    "upsell": {"revenue": 5.0, "growth_rate": 0.19},
-    "legacy": {"revenue": 8.0, "growth_rate": -0.20}
-  }
-}
-```
-
-**Returns:**
-- Lifecycle-weighted growth (decimal and percentage)
-- Stage breakdown (high_growth, mature, declining)
-- Portfolio quality rating
-
----
-
-### Function 11: calculate_organic_growth
+### Function 7: calculate_organic_growth
 
 **Purpose:** Calculates year-over-year organic revenue growth excluding acquisitions, divestitures, and other inorganic factors.
 
@@ -477,7 +364,7 @@ Open the URL provided in your browser and:
 1. Set **Transport Type:** `SSE`
 2. Set **URL:** `http://localhost:8002/sse`
 3. Click `Connect`
-4. Click `List Tools` to see all eleven functions
+4. Click `List Tools` to see all seven functions
 5. Select any function, fill parameters, and click `Run tool`
 
 ## 📦 Claude Desktop Integration
@@ -503,7 +390,7 @@ This creates `finance-engine-mcp-server.mcpb` file.
 Try asking Claude:
 
 **Company Health:**
-> "Calculate the company health score for a business with 8.83% revenue growth, 95% retention rate, operational score of 81.1, 37.7% modern revenue, CSAT of 89, and pipeline coverage of 0.849. What's their risk level?"
+> "Calculate the company health score for a business with 9% revenue growth, 98.5% SLA compliance, 37.7% modern revenue, customer satisfaction of 89, and pipeline coverage of 0.849. What's their risk level?"
 
 **Operating Leverage:**
 > "Our revenue grew 9% while costs only grew 6%. Calculate our operating leverage and tell me what the margin expansion is in basis points."
@@ -623,7 +510,7 @@ When querying an LLM with this MCP agent:
 3. **Ask for explanations** - Functions provide detailed breakdowns
 4. **Combine calculations** - Use multiple functions for comprehensive analysis
 5. **Use natural language** - No need to know exact API parameters
-6. **Enterprise metrics** - Use Tier 3 functions for portfolio analysis and operational efficiency
+6. **Portfolio analytics** - Use portfolio functions for diversification and concentration risk analysis
 
 ## 🔒 Security
 
