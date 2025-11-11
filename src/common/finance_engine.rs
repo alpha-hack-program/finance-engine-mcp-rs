@@ -1068,6 +1068,12 @@ impl FinanceEngine {
 #[tool_handler]
 impl ServerHandler for FinanceEngine {
     fn get_info(&self) -> ServerInfo {
+        // Read basic information from .env file (replaced by sync script during release)
+        let name = "finance-engine-mcp-rs".to_string();
+        let version = "1.1.0".to_string();
+        let title = "Finance Engine MCP Server".to_string();
+        let website_url = "https://github.com/alpha-hack-program/finance-engine-mcp-rs.git".to_string();
+
         ServerInfo {
             instructions: Some(
                 "Finance Engine providing seven calculation functions for financial analysis and business intelligence:\
@@ -1085,11 +1091,11 @@ impl ServerHandler for FinanceEngine {
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: rmcp::model::Implementation {
-                name: "finance-engine".to_string(),
-                version: "2.0.0".to_string(),
-                title: None,
-                icons: None,
-                website_url: None,
+                name: name,
+                version: version, 
+                title: Some(title), 
+                icons: None, 
+                website_url: Some(website_url) 
             },
             ..Default::default()
         }
