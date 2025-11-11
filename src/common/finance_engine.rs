@@ -6,10 +6,11 @@ use super::metrics::{increment_requests, increment_errors, RequestTimer};
 
 use rmcp::{
     ServerHandler,
-    handler::server::{router::tool::ToolRouter, tool::Parameters},
+    handler::server::router::tool::ToolRouter,
+    handler::server::wrapper::Parameters,
     model::{ServerCapabilities, ServerInfo, CallToolResult, Content},
     ErrorData as McpError,
-    schemars, tool, tool_handler, tool_router,
+    schemars, tool, tool_handler, tool_router
 };
 
 // =================== PARSING UTILITIES ===================
@@ -1086,6 +1087,9 @@ impl ServerHandler for FinanceEngine {
             server_info: rmcp::model::Implementation {
                 name: "finance-engine".to_string(),
                 version: "2.0.0".to_string(),
+                title: None,
+                icons: None,
+                website_url: None,
             },
             ..Default::default()
         }
@@ -1111,7 +1115,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: CompanyHealthScoreResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1149,7 +1153,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: RevenueQualityScoreResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1168,7 +1172,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: HHIResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1188,7 +1192,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: OperatingLeverageResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1212,7 +1216,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         assert!(json_text.contains("Cost growth rate cannot be zero"));
     }
@@ -1244,7 +1248,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: PortfolioMomentumResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1266,7 +1270,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: GiniCoefficientResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1290,7 +1294,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         assert!(json_text.contains("Revenue list cannot be empty"));
     }
@@ -1307,7 +1311,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: OrganicGrowthResponse = serde_json::from_str(json_text).unwrap();
         
@@ -1332,7 +1336,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         assert!(json_text.contains("Prior period revenue must be positive"));
     }
@@ -1349,7 +1353,7 @@ mod tests {
         assert!(result.is_ok());
         
         let call_result = result.unwrap();
-        let content = call_result.content.unwrap();
+        let content = call_result.content;
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: OrganicGrowthResponse = serde_json::from_str(json_text).unwrap();
         
