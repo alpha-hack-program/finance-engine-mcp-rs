@@ -1,11 +1,11 @@
 # Finance Engine MCP Server
 
-> **Advanced Model Context Protocol (MCP) Server providing seven sophisticated financial calculation functions for business intelligence and strategic decision-making**
+> **Advanced Model Context Protocol (MCP) Server providing eight sophisticated financial calculation functions for business intelligence and strategic decision-making**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-%23000000.svg?style=flat&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-A production-ready Model Context Protocol (MCP) server developed in Rust that provides seven strongly-typed financial calculation functions. This project demonstrates how to build enterprise-grade MCP servers with sophisticated multi-step calculations for financial analysis and business intelligence.
+A production-ready Model Context Protocol (MCP) server developed in Rust that provides eight strongly-typed financial calculation functions. This project demonstrates how to build enterprise-grade MCP servers with sophisticated multi-step calculations for financial analysis and business intelligence.
 
 ## Why This Finance Engine MCP Server?
 
@@ -19,7 +19,7 @@ This Finance Engine provides:
 
 ## ⚠️ **DISCLAIMER**
 
-This server provides seven calculation functions that demonstrate sophisticated financial analysis patterns commonly used in business intelligence applications. All calculations are explicit and transparent.
+This server provides eight calculation functions that demonstrate sophisticated financial analysis patterns commonly used in business intelligence applications. All calculations are explicit and transparent.
 
 **This is a demonstration/example project only.** The calculations and logic implemented here are for educational and demonstration purposes. This software:
 
@@ -32,15 +32,17 @@ For real financial analysis or business decisions, please consult appropriate pr
 
 ## Introduction
 
-The Finance Engine MCP Server provides sophisticated financial metrics calculation capabilities to AI agents through the Model Context Protocol. It implements seven critical business intelligence functions for enterprise-grade financial analysis:
+The Finance Engine MCP Server provides sophisticated financial metrics calculation capabilities to AI agents through the Model Context Protocol. It implements eight critical business intelligence functions for enterprise-grade financial analysis:
 
 - **Critical Business Metrics** - Company health scoring, revenue quality assessment, and concentration risk analysis
 - **Operational Metrics** - Operating leverage and scalability assessment
 - **Portfolio Analytics** - Revenue-weighted momentum, diversification, and organic growth analysis
+- **Vector Store Integration** - Retrieve financial metrics from OpenAI vector stores
 
 ## 🎯 Features
 
-- **7 Financial Calculation Functions**: Comprehensive business intelligence metrics
+- **8 Financial Calculation Functions**: Comprehensive business intelligence metrics
+- **Vector Store Integration**: Query financial metrics using OpenAI's vector store API
 - **Explicit Multi-Step Logic**: All calculations transparent and verifiable
 - **Robust Input Validation**: JSON schema validation with detailed error handling
 - **Multiple Transport Protocols**: STDIO, SSE, and Streamable HTTP
@@ -85,20 +87,40 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 | **calculate_gini_coefficient** | Revenue concentration risk (Gini coefficient) | Gini coefficient, diversification score, concentration level |
 | **calculate_organic_growth** | YoY organic growth (excl. M&A) | Organic growth rate, absolute growth, growth rating |
 
+### Vector Store Integration
+
+| Function | Description | Key Output |
+|----------|-------------|------------|
+| **get_metrics_from_vector_store** | Retrieve financial metrics from OpenAI vector store | Array of matching chunks with content, scores, and metadata |
+
 > **Note**: These functions implement sophisticated multi-step calculations combining multiple business dimensions.
 
 ## 📊 Function Details
 
 ### Function 1: calculate_company_health_score
 
-**Purpose:** Calculates comprehensive company health by combining five weighted dimensions.
+**Purpose:** Calculates comprehensive company health by combining three weighted dimensions using only directly extractable metrics.
 
 **Weights:**
-- Revenue growth: 30%
-- SLA compliance: 25%
-- Modern revenue percentage (innovation): 20%
-- Customer satisfaction: 15%
-- Pipeline coverage: 10%
+- Revenue growth: 40%
+- SLA compliance: 35%
+- Customer satisfaction: 25%
+
+**Example:**
+```json
+{
+  "revenue_growth": "0.09",
+  "sla_compliance": "0.985",
+  "customer_satisfaction": "89"
+}
+```
+
+**Returns:**
+- Overall health score (0-100)
+- Component scores for each dimension
+- Weighted contributions
+- Risk level: LOW (≥80), MEDIUM (65-79), HIGH (50-64), or CRITICAL (<50)
+- Human-readable interpretation
 
 **Example:**
 ```json
@@ -294,6 +316,66 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 - Growth rating
 - Annualized CAGR
 
+### Function 8: get_metrics_from_vector_store
+
+**Purpose:** Intelligently retrieves financial metrics from a vector store by automatically generating appropriate queries based on the target finance calculation function. Supports all 7 calculation functions with function-specific query templates.
+
+**Environment Variables Required:**
+- `VECTOR_STORE_API_URL`: The full endpoint URL including vector store ID (e.g., `https://your-server.com/v1/openai/v1/vector_stores/vs_abc123/search`)
+
+**Parameters:**
+- `function_name` (string, required): Name of the finance function (e.g., "calculate_organic_growth", "calculate_company_health_score")
+- `company_name` (string, required): Company name to query metrics for
+- `max_num_results` (number, optional): Maximum number of results to return (default: 10, range: 1-100)
+- `score_threshold` (number, optional): Minimum similarity score for results (default: 0.5, range: 0.0-1.0)
+- `ranker` (string, optional): Ranker algorithm to use (default: "default")
+- `rewrite_query` (boolean, optional): Whether to rewrite the query (default: false)
+
+**Example:**
+```json
+{
+  "function_name": "calculate_organic_growth",
+  "company_name": "Parasol",
+  "max_num_results": 10,
+  "score_threshold": 0.5
+}
+```
+
+**Auto-Generated Query:** 
+"What is the current revenue and prior period revenue for company Parasol?"
+
+**Supported Functions:**
+- `calculate_company_health_score` → Queries for: revenue growth, SLA compliance, modern revenue %, customer satisfaction, pipeline coverage
+- `calculate_revenue_quality_score` → Queries for: high growth, stable, declining, and total revenue
+- `calculate_hhi_and_diversification` → Queries for: revenue by business segment
+- `calculate_operating_leverage` → Queries for: revenue and cost growth rates
+- `calculate_portfolio_momentum` → Queries for: segment revenue and growth rates
+- `calculate_gini_coefficient` → Queries for: revenue values by segment
+- `calculate_organic_growth` → Queries for: current and prior period revenue
+
+**Returns:**
+- Array of matching metric chunks, each containing:
+  - `file_id`: Source file identifier
+  - `filename`: Name of source document
+  - `content`: Array of content items with text
+  - `score`: Similarity score (0.0-1.0)
+  - `attributes`: Document attributes (token count, etc.)
+- Total number of chunks returned
+- Generated query string
+
+**Use Cases:**
+- Automatically retrieve metrics for specific calculation functions
+- Consistent query generation across different companies
+- Simplify metric gathering for AI agents
+- Direct integration with finance calculation pipeline
+
+**Error Handling:**
+- Validates function name against supported functions
+- Validates max_num_results is between 1 and 100
+- Validates score_threshold is between 0.0 and 1.0
+- Returns descriptive errors for missing environment variables
+- Returns HTTP error details if API call fails
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -303,6 +385,26 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 - `jq` for JSON processing ([Install jq](https://jqlang.github.io/jq/download/))
 - `cargo-release` for version management: `cargo install cargo-release`
 - NodeJS 19+ if testing with [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector)
+
+### Environment Variables (Optional)
+
+For the `get_metrics_from_vector_store` function, set these environment variables:
+
+```bash
+# Vector Store Name
+export VECTOR_STORE_NAME=rag-store
+
+# LlamaStack Host (without protocol)
+export LLAMA_STACK_HOST=llama-stack-demo-route-llama-stack-demo.example.com
+
+# LlamaStack Port
+export LLAMA_STACK_PORT=443
+
+# Use HTTPS/secure connection
+export LLAMA_STACK_SECURE=true
+```
+
+> **Note**: These environment variables are only required if you plan to use the vector store integration feature. Update the values to match your LlamaStack deployment.
 
 ### 📥 Installation
 

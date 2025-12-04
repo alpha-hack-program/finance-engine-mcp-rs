@@ -1,6 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 use std::collections::HashMap;
 use std::fmt;
+use std::env;
 
 use super::metrics::{increment_requests, increment_errors, RequestTimer};
 
@@ -155,14 +156,8 @@ pub struct CompanyHealthScoreParams {
     #[schemars(description = "Service Level Agreement compliance rate as decimal (e.g., 0.985 for 98.5%)")]
     pub sla_compliance: String,
     #[serde(deserialize_with = "deserialize_flexible_f64")]
-    #[schemars(description = "Percentage of revenue from subscription/recurring revenue streams as decimal (e.g., 0.377 for 37.7%)")]
-    pub modern_revenue_pct: String,
-    #[serde(deserialize_with = "deserialize_flexible_f64")]
     #[schemars(description = "Customer satisfaction score on 0-100 scale")]
     pub customer_satisfaction: String,
-    #[serde(deserialize_with = "deserialize_flexible_f64")]
-    #[schemars(description = "Ratio of active sales pipeline value to annual revenue as decimal (e.g., 0.849 for 84.9%)")]
-    pub pipeline_coverage: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
@@ -363,6 +358,145 @@ pub struct OrganicGrowthResponse {
     pub annualized_cagr: f64,
 }
 
+// Function 12: get_metrics_from_vector_store
+#[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+pub struct VectorStoreQueryParams {
+    #[schemars(description = "Name of the finance function to get metrics for (e.g., 'calculate_company_health_score', 'calculate_organic_growth')")]
+    pub function_name: String,
+    #[schemars(description = "Company name to query metrics for")]
+    pub company_name: String,
+    #[schemars(description = "Maximum number of results to return (default: 5)")]
+    #[serde(default = "default_max_results")]
+    pub max_num_results: usize,
+    #[schemars(description = "Minimum score threshold for results (default: 0.8)")]
+    #[serde(default = "default_score_threshold")]
+    pub score_threshold: f64,
+    #[schemars(description = "Ranker to use for scoring (default: 'default')")]
+    #[serde(default = "default_ranker")]
+    pub ranker: String,
+    #[schemars(description = "Whether to rewrite the query (default: false)")]
+    #[serde(default)]
+    pub rewrite_query: bool,
+}
+
+fn default_max_results() -> usize {
+    5
+}
+
+fn default_score_threshold() -> f64 {
+    0.8
+}
+
+fn default_ranker() -> String {
+    "default".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+pub struct MetricChunk {
+    #[schemars(description = "File ID from the vector store")]
+    pub file_id: String,
+    #[schemars(description = "Filename of the source document")]
+    pub filename: String,
+    #[schemars(description = "Chunk content/text array")]
+    pub content: Vec<ContentItem>,
+    #[schemars(description = "Similarity score (0.0-1.0)")]
+    pub score: f64,
+    #[schemars(description = "Attributes associated with the chunk")]
+    pub attributes: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+pub struct ContentItem {
+    #[serde(rename = "type")]
+    #[schemars(description = "Content type (e.g., 'text')")]
+    pub content_type: String,
+    #[schemars(description = "The text content")]
+    pub text: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+pub struct VectorStoreQueryResponse {
+    #[schemars(description = "Array of matching metric chunks")]
+    pub chunks: Vec<MetricChunk>,
+    #[schemars(description = "Total number of chunks returned")]
+    pub total_chunks: usize,
+    #[schemars(description = "Query that was executed")]
+    pub query: String,
+}
+
+// OpenAI Vector Store API response structures
+#[derive(Debug, Serialize)]
+struct RankingOptions {
+    ranker: String,
+    score_threshold: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct VectorStoreSearchRequest {
+    query: String,
+    max_num_results: usize,
+    ranking_options: RankingOptions,
+    rewrite_query: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIVectorStoreResponse {
+    data: Vec<OpenAISearchResult>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAISearchResult {
+    file_id: String,
+    filename: String,
+    score: f64,
+    attributes: HashMap<String, serde_json::Value>,
+    content: Vec<OpenAIContentItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenAIContentItem {
+    #[serde(rename = "type")]
+    content_type: String,
+    text: String,
+}
+
+// Vector Store list response structures
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct VectorStoreListResponse {
+    object: String,
+    data: Vec<VectorStoreItem>,
+    first_id: String,
+    last_id: String,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct VectorStoreItem {
+    id: String,
+    object: String,
+    created_at: i64,
+    name: String,
+    usage_bytes: u64,
+    file_counts: FileCountsInfo,
+    status: String,
+    expires_after: Option<serde_json::Value>,
+    expires_at: Option<i64>,
+    last_active_at: i64,
+    metadata: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct FileCountsInfo {
+    completed: u32,
+    cancelled: u32,
+    failed: u32,
+    in_progress: u32,
+    total: u32,
+}
+
 // =================== FINANCE ENGINE ===================
 
 #[derive(Debug, Clone)]
@@ -371,26 +505,18 @@ pub struct FinanceEngine {
 }
 
 impl FinanceEngine {
-    /// Calculate company health score checked [√]
+    /// Calculate company health score using only directly extractable metrics
     fn calculate_company_health_score_internal(
         revenue_growth: f64,
         sla_compliance: f64,
-        modern_revenue_pct: f64,
         customer_satisfaction: f64,
-        pipeline_coverage: f64,
     ) -> Result<CompanyHealthScoreResponse, String> {
         // Validation
         if sla_compliance < 0.0 || sla_compliance > 1.0 {
             return Err("SLA compliance must be between 0.0 and 1.0".to_string());
         }
-        if modern_revenue_pct < 0.0 || modern_revenue_pct > 1.0 {
-            return Err("Modern revenue percentage must be between 0.0 and 1.0".to_string());
-        }
         if customer_satisfaction < 0.0 || customer_satisfaction > 100.0 {
             return Err("Customer satisfaction must be between 0.0 and 100.0".to_string());
-        }
-        if pipeline_coverage < 0.0 {
-            return Err("Pipeline coverage must be >= 0.0".to_string());
         }
 
         // Convert to 0-100 scale
@@ -400,29 +526,21 @@ impl FinanceEngine {
         // Service Level Agreement Compliance: Direct percentage conversion
         let sla_score = sla_compliance * 100.0;
         
-        // Modern Revenue Percentage: Direct percentage conversion
-        let innovation_score = modern_revenue_pct * 100.0;
-        
         // Customer Satisfaction: Already 0-100, use as-is
         let satisfaction_score = customer_satisfaction;
-        
-        // Pipeline Coverage: 0% coverage = 0 points, 100%+ coverage = 100 points
-        let pipeline_score = (pipeline_coverage * 100.0).min(100.0);
 
         let mut components = HashMap::new();
         components.insert("revenue".to_string(), revenue_score);
         components.insert("sla".to_string(), sla_score);
-        components.insert("innovation".to_string(), innovation_score);
         components.insert("satisfaction".to_string(), satisfaction_score);
-        components.insert("pipeline".to_string(), pipeline_score);
 
-        // Apply weights
+        // Apply weights (redistributed from original 5 metrics to 3)
+        // Original: revenue=30%, sla=25%, innovation=20%, satisfaction=15%, pipeline=10%
+        // Adjusted: revenue=40%, sla=35%, satisfaction=25% (proportionally redistributed)
         let weights = [
-            ("revenue", 0.30),
-            ("sla", 0.25),
-            ("innovation", 0.20),
-            ("satisfaction", 0.15),
-            ("pipeline", 0.10),
+            ("revenue", 0.40),
+            ("sla", 0.35),
+            ("satisfaction", 0.25),
         ];
 
         let mut weighted_contributions = HashMap::new();
@@ -436,11 +554,11 @@ impl FinanceEngine {
 
         // Classify risk
         let (risk_level, interpretation) = if overall_score >= 80.0 {
-            ("LOW", "Company health is excellent across all dimensions.")
+            ("LOW", "Company health is excellent across measured dimensions.")
         } else if overall_score >= 65.0 {
             ("MEDIUM", "Company health is good but some areas need attention for optimal performance.")
         } else if overall_score >= 50.0 {
-            ("HIGH", "Company faces significant challenges in multiple areas requiring strategic intervention.")
+            ("HIGH", "Company faces significant challenges requiring strategic intervention.")
         } else {
             ("CRITICAL", "Company health is critical with severe issues across key performance indicators.")
         };
@@ -777,6 +895,243 @@ impl FinanceEngine {
             annualized_cagr: (growth_rate * 10000.0).round() / 100.0,
         })
     }
+
+    /// Validate vector store query parameters
+    fn validate_vector_store_params(
+        function_name: &str,
+        max_num_results: usize,
+        score_threshold: f64,
+    ) -> Result<(), String> {
+        // Validate function name by trying to generate a query
+        Self::generate_query_for_function(function_name, "test")?;
+
+        if max_num_results == 0 || max_num_results > 10 {
+            return Err("max_num_results must be between 1 and 10".to_string());
+        }
+
+        if score_threshold < 0.0 || score_threshold > 1.0 {
+            return Err("score_threshold must be between 0.0 and 1.0".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Build the LLama Stack base URL from environment variables
+    fn build_llama_stack_url() -> Result<String, String> {
+        let host = env::var("LLAMA_STACK_HOST")
+            .map_err(|_| "LLAMA_STACK_HOST environment variable not set".to_string())?;
+        let port = env::var("LLAMA_STACK_PORT")
+            .map_err(|_| "LLAMA_STACK_PORT environment variable not set".to_string())?;
+        let secure = env::var("LLAMA_STACK_SECURE")
+            .map_err(|_| "LLAMA_STACK_SECURE environment variable not set".to_string())?;
+        
+        let protocol = if secure.to_lowercase() == "true" || secure == "1" {
+            "https"
+        } else {
+            "http"
+        };
+        
+        Ok(format!("{}://{}:{}", protocol, host, port))
+    }
+    
+    /// Get vector store ID by name from LLama Stack
+    async fn get_vector_store_id_by_name(vector_store_name: &str) -> Result<String, String> {
+        let base_url = Self::build_llama_stack_url()?;
+        let list_url = format!("{}/v1/openai/v1/vector_stores?limit=20", base_url);
+        
+        tracing::info!("Fetching vector store list from: {}", list_url);
+        
+        // Create HTTP client
+        let client = reqwest::Client::new();
+        
+        // Make API request to list vector stores
+        let response = client
+            .get(&list_url)
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .map_err(|e| format!("Failed to connect to vector store list endpoint: {}", e))?;
+        
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("Vector store list API error ({}): {}", status, error_text));
+        }
+        
+        // Parse response
+        let list_response: VectorStoreListResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse vector store list response: {}", e))?;
+        
+        // Find all vector stores with matching name
+        let mut matching_stores: Vec<String> = Vec::new();
+        for store in list_response.data {
+            if store.name == vector_store_name {
+                matching_stores.push(store.id.clone());
+                tracing::info!("Found vector store '{}' with ID: {}", vector_store_name, store.id);
+            }
+        }
+        
+        // Check the number of matches
+        match matching_stores.len() {
+            0 => Err(format!("Vector store with name '{}' not found", vector_store_name)),
+            1 => Ok(matching_stores[0].clone()),
+            n => Err(format!(
+                "Multiple vector stores ({}) found with name '{}'. Expected exactly one.",
+                n, vector_store_name
+            )),
+        }
+    }
+
+    /// Get metrics from vector store using OpenAI Responses API
+    async fn get_metrics_from_vector_store_internal(
+        vector_store_api_url: String,
+        function_name: String,
+        company_name: String,
+        max_num_results: usize,
+        score_threshold: f64,
+        ranker: String,
+        rewrite_query: bool,
+    ) -> Result<VectorStoreQueryResponse, String> {
+        // Generate appropriate query based on function name
+        let query = Self::generate_query_for_function(&function_name, &company_name)?;
+
+        // Log the query using INFO level
+        tracing::info!("Generated query: {}", query);
+
+        // Validate inputs
+        if query.trim().is_empty() {
+            return Err("Generated query is empty".to_string());
+        }
+
+        // Create HTTP client
+        let client = reqwest::Client::new();
+
+        // Prepare request body matching the LlamaStack API format
+        let request_body = VectorStoreSearchRequest {
+            query: query.clone(),
+            max_num_results,
+            ranking_options: RankingOptions {
+                ranker: ranker.clone(),
+                score_threshold,
+            },
+            rewrite_query,
+        };
+
+        // Log before request using INFO level
+        tracing::info!("Vector store URL: {}", vector_store_api_url);
+
+        // Make API request to Vector Store
+        let response = client
+            .post(&vector_store_api_url)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to connect to vector store: {}", e))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("Vector store API error ({}): {}", status, error_text));
+        }
+
+        // Parse response
+        let api_response: OpenAIVectorStoreResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse vector store response: {}", e))?;
+
+        // Convert to our response format
+        let chunks: Vec<MetricChunk> = api_response
+            .data
+            .into_iter()
+            .map(|result| MetricChunk {
+                file_id: result.file_id,
+                filename: result.filename,
+                content: result.content.into_iter().map(|c| ContentItem {
+                    content_type: c.content_type,
+                    text: c.text,
+                }).collect(),
+                score: result.score,
+                attributes: result.attributes,
+            })
+            .collect();
+
+        let total_chunks = chunks.len();
+
+        Ok(VectorStoreQueryResponse {
+            chunks,
+            total_chunks,
+            query,
+        })
+    }
+
+    /// Generate an appropriate query based on the function name and company
+    fn generate_query_for_function(function_name: &str, company_name: &str) -> Result<String, String> {
+        let query = match function_name {
+            "calculate_company_health_score" => {
+                format!(
+                    "What are the revenue growth, SLA compliance, and customer satisfaction metrics for company {}?",
+                    company_name
+                )
+            },
+            "calculate_revenue_quality_score" => {
+                format!(
+                    "What is the high growth revenue, stable revenue, declining revenue, \
+                     and total revenue for company {}?",
+                    company_name
+                )
+            },
+            "calculate_hhi_and_diversification" => {
+                format!(
+                    "What are the revenue values for each business segment of company {}?",
+                    company_name
+                )
+            },
+            "calculate_operating_leverage" => {
+                format!(
+                    "What is the revenue growth rate and cost growth rate for company {}?",
+                    company_name
+                )
+            },
+            "calculate_portfolio_momentum" => {
+                format!(
+                    "What are the revenue and growth rate for each segment of company {}?",
+                    company_name
+                )
+            },
+            "calculate_gini_coefficient" => {
+                format!(
+                    "What are the revenue values by segment for company {}?",
+                    company_name
+                )
+            },
+            "calculate_organic_growth" => {
+                format!(
+                    "What is the current revenue and prior period revenue for company {}?",
+                    company_name
+                )
+            },
+            _ => {
+                return Err(format!("Unknown function name: '{}'. Valid functions are: \
+                    calculate_company_health_score, calculate_revenue_quality_score, \
+                    calculate_hhi_and_diversification, calculate_operating_leverage, \
+                    calculate_portfolio_momentum, calculate_gini_coefficient, \
+                    calculate_organic_growth", function_name));
+            }
+        };
+
+        Ok(query)
+    }
 }
 
 #[tool_router]
@@ -787,7 +1142,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate comprehensive company health score (0-100) by combining five weighted dimensions: revenue growth (30%), Service Level Agreement compliance (25%), modern revenue percentage (20%), customer satisfaction (15%), and pipeline coverage (10%). Returns overall score, individual components, weighted contributions, risk level classification (LOW/MEDIUM/HIGH/CRITICAL), and interpretation.")]
+    #[tool(description = "Calculate comprehensive company health score (0-100) by combining three weighted dimensions: revenue growth (40%), Service Level Agreement compliance (35%), and customer satisfaction (25%). Uses only directly extractable metrics. Returns overall score, individual components, weighted contributions, risk level classification (LOW/MEDIUM/HIGH/CRITICAL), and interpretation.")]
     pub async fn calculate_company_health_score(
         &self,
         Parameters(params): Parameters<CompanyHealthScoreParams>,
@@ -812,14 +1167,6 @@ impl FinanceEngine {
             }
         };
 
-        let modern_revenue_pct = match parse_f64_from_string(&params.modern_revenue_pct) {
-            Ok(v) => v,
-            Err(e) => {
-                increment_errors();
-                return Ok(CallToolResult::error(vec![Content::text(format!("Invalid modern_revenue_pct: {}", e))]));
-            }
-        };
-
         let customer_satisfaction = match parse_f64_from_string(&params.customer_satisfaction) {
             Ok(v) => v,
             Err(e) => {
@@ -828,20 +1175,10 @@ impl FinanceEngine {
             }
         };
 
-        let pipeline_coverage = match parse_f64_from_string(&params.pipeline_coverage) {
-            Ok(v) => v,
-            Err(e) => {
-                increment_errors();
-                return Ok(CallToolResult::error(vec![Content::text(format!("Invalid pipeline_coverage: {}", e))]));
-            }
-        };
-
         match Self::calculate_company_health_score_internal(
             revenue_growth,
             sla_compliance,
-            modern_revenue_pct,
             customer_satisfaction,
-            pipeline_coverage,
         ) {
             Ok(result) => match serde_json::to_string_pretty(&result) {
                 Ok(json_str) => Ok(CallToolResult::success(vec![Content::text(json_str)])),
@@ -1063,6 +1400,77 @@ impl FinanceEngine {
             }
         }
     }
+
+    #[tool(description = "Retrieve financial metrics from a vector store for a specific finance calculation function. Automatically generates appropriate queries based on the function name (e.g., 'calculate_organic_growth' generates query for current and prior revenue). Supports all 7 calculation functions. Requires VECTOR_STORE_NAME, LLAMA_STACK_HOST, LLAMA_STACK_PORT, and LLAMA_STACK_SECURE environment variables. Returns an array of matching chunks with content, similarity scores, and metadata.")]
+    pub async fn get_metrics_from_vector_store(
+        &self,
+        Parameters(params): Parameters<VectorStoreQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let _timer = RequestTimer::new();
+        increment_requests();
+
+        // Validate parameters first (before any network calls)
+        if let Err(e) = Self::validate_vector_store_params(
+            &params.function_name,
+            params.max_num_results,
+            params.score_threshold,
+        ) {
+            increment_errors();
+            return Ok(CallToolResult::error(vec![Content::text(format!("Validation error: {}", e))]));
+        }
+
+        // Get vector store name from environment
+        let vector_store_name = match env::var("VECTOR_STORE_NAME") {
+            Ok(name) => name,
+            Err(_) => {
+                increment_errors();
+                return Ok(CallToolResult::error(vec![Content::text("VECTOR_STORE_NAME environment variable not set")]));
+            }
+        };
+
+        // Get vector store ID by name
+        let vector_store_id = match Self::get_vector_store_id_by_name(&vector_store_name).await {
+            Ok(id) => id,
+            Err(e) => {
+                increment_errors();
+                return Ok(CallToolResult::error(vec![Content::text(format!("Failed to get vector store ID: {}", e))]));
+            }
+        };
+
+        // Build the base URL
+        let base_url = match Self::build_llama_stack_url() {
+            Ok(url) => url,
+            Err(e) => {
+                increment_errors();
+                return Ok(CallToolResult::error(vec![Content::text(format!("Failed to build LLama Stack URL: {}", e))]));
+            }
+        };
+
+        // Build the full search API URL
+        let vector_store_api_url = format!("{}/v1/openai/v1/vector_stores/{}/search", base_url, vector_store_id);
+
+        match Self::get_metrics_from_vector_store_internal(
+            vector_store_api_url,
+            params.function_name,
+            params.company_name,
+            params.max_num_results,
+            params.score_threshold,
+            params.ranker,
+            params.rewrite_query,
+        ).await {
+            Ok(result) => match serde_json::to_string_pretty(&result) {
+                Ok(json_str) => Ok(CallToolResult::success(vec![Content::text(json_str)])),
+                Err(e) => {
+                    increment_errors();
+                    Ok(CallToolResult::error(vec![Content::text(format!("Serialization error: {}", e))]))
+                }
+            },
+            Err(e) => {
+                increment_errors();
+                Ok(CallToolResult::error(vec![Content::text(format!("Vector store query error: {}", e))]))
+            }
+        }
+    }
 }
 
 #[tool_handler]
@@ -1076,7 +1484,7 @@ impl ServerHandler for FinanceEngine {
 
         ServerInfo {
             instructions: Some(
-                "Finance Engine providing seven calculation functions for financial analysis and business intelligence:\
+                "Finance Engine providing eight calculation functions for financial analysis and business intelligence:\
                  \n\n**Critical Business Metrics**\
                  \n1. calculate_company_health_score - Comprehensive 0-100 health score combining five weighted dimensions: revenue growth (30%), SLA compliance (25%), modern revenue percentage (20%), customer satisfaction (15%), and pipeline coverage (10%)\
                  \n2. calculate_revenue_quality_score - Revenue quality evaluation with high-growth, stable, and declining categorization\
@@ -1087,6 +1495,8 @@ impl ServerHandler for FinanceEngine {
                  \n5. calculate_portfolio_momentum - Revenue-weighted portfolio momentum index showing aggregate growth trajectory\
                  \n6. calculate_gini_coefficient - Gini coefficient for revenue concentration and diversification risk analysis\
                  \n7. calculate_organic_growth - Year-over-year organic revenue growth excluding inorganic factors\
+                 \n\n**Vector Store Integration**\
+                 \n8. get_metrics_from_vector_store - Retrieve financial metrics from OpenAI vector store using semantic search\
                  \n\nAll functions perform sophisticated multi-step calculations with comprehensive validation.".into()
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
@@ -1112,9 +1522,7 @@ mod tests {
         let params = CompanyHealthScoreParams {
             revenue_growth: "0.09".to_string(),
             sla_compliance: "0.985".to_string(),
-            modern_revenue_pct: "0.377".to_string(),
             customer_satisfaction: "89.0".to_string(),
-            pipeline_coverage: "0.849".to_string(),
         };
         
         let result = engine.calculate_company_health_score(Parameters(params)).await;
@@ -1125,24 +1533,23 @@ mod tests {
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         let response: CompanyHealthScoreResponse = serde_json::from_str(json_text).unwrap();
         
-        // Expected overall score: 72.0 based on spec example
-        assert!(response.overall_score > 70.0 && response.overall_score < 74.0);
-        assert!(response.overall_score <= 100.0);
-        assert_eq!(response.risk_level, "MEDIUM");
+        // With 3 metrics: revenue=40%, sla=35%, satisfaction=25%
+        // revenue_score = (0.09 / 0.15) * 100 = 60
+        // sla_score = 0.985 * 100 = 98.5
+        // satisfaction_score = 89
+        // Overall = 60*0.40 + 98.5*0.35 + 89*0.25 = 24 + 34.475 + 22.25 = 80.725
+        assert!(response.overall_score > 80.0 && response.overall_score < 81.0);
+        assert_eq!(response.risk_level, "LOW");
         
         // Verify component scores
         assert!((response.components["revenue"] - 60.0).abs() < 0.1);
         assert!((response.components["sla"] - 98.5).abs() < 0.1);
-        assert!((response.components["innovation"] - 37.7).abs() < 0.1);
         assert!((response.components["satisfaction"] - 89.0).abs() < 0.1);
-        assert!((response.components["pipeline"] - 84.9).abs() < 0.1);
         
         // Verify weighted contributions
-        assert!((response.weighted_contributions["revenue"] - 18.0).abs() < 0.1);
-        assert!((response.weighted_contributions["sla"] - 24.625).abs() < 0.1);
-        assert!((response.weighted_contributions["innovation"] - 7.54).abs() < 0.1);
-        assert!((response.weighted_contributions["satisfaction"] - 13.35).abs() < 0.1);
-        assert!((response.weighted_contributions["pipeline"] - 8.49).abs() < 0.1);
+        assert!((response.weighted_contributions["revenue"] - 24.0).abs() < 0.1);
+        assert!((response.weighted_contributions["sla"] - 34.475).abs() < 0.1);
+        assert!((response.weighted_contributions["satisfaction"] - 22.25).abs() < 0.1);
     }
 
     #[tokio::test]
@@ -1366,5 +1773,127 @@ mod tests {
         assert!(response.organic_growth_rate < 0.0);
         assert_eq!(response.growth_rating, "Declining");
     }
-}
 
+    #[test]
+    fn test_get_metrics_from_vector_store_query_generation() {
+        // Test that queries are generated correctly even with empty company name
+        let query = FinanceEngine::generate_query_for_function("calculate_organic_growth", "").unwrap();
+        assert!(!query.is_empty());
+        assert!(query.contains("current") || query.contains("revenue"));
+        
+        // Test with actual company name
+        let query = FinanceEngine::generate_query_for_function("calculate_organic_growth", "Parasol").unwrap();
+        assert!(query.contains("Parasol"));
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_from_vector_store_invalid_function() {
+        let engine = FinanceEngine::new();
+        let params = VectorStoreQueryParams {
+            function_name: "invalid_function_name".to_string(),
+            company_name: "Parasol".to_string(),
+            max_num_results: 5,
+            score_threshold: 0.8,
+            ranker: "default".to_string(),
+            rewrite_query: false,
+        };
+        
+        // Set dummy env vars with new structure
+        unsafe {
+            std::env::set_var("VECTOR_STORE_NAME", "rag-store");
+            std::env::set_var("LLAMA_STACK_HOST", "example.com");
+            std::env::set_var("LLAMA_STACK_PORT", "443");
+            std::env::set_var("LLAMA_STACK_SECURE", "true");
+        }
+        
+        let result = engine.get_metrics_from_vector_store(Parameters(params)).await;
+        assert!(result.is_ok());
+        
+        let call_result = result.unwrap();
+        let content = call_result.content;
+        let json_text = content[0].raw.as_text().unwrap().text.as_str();
+        assert!(json_text.contains("Unknown function name"));
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_from_vector_store_invalid_max_results() {
+        let engine = FinanceEngine::new();
+        let params = VectorStoreQueryParams {
+            function_name: "calculate_organic_growth".to_string(),
+            company_name: "Parasol".to_string(),
+            max_num_results: 0,
+            score_threshold: 0.5,
+            ranker: "default".to_string(),
+            rewrite_query: false,
+        };
+        
+        // Set dummy env vars with new structure
+        unsafe {
+            std::env::set_var("VECTOR_STORE_NAME", "rag-store");
+            std::env::set_var("LLAMA_STACK_HOST", "example.com");
+            std::env::set_var("LLAMA_STACK_PORT", "443");
+            std::env::set_var("LLAMA_STACK_SECURE", "true");
+        }
+        
+        let result = engine.get_metrics_from_vector_store(Parameters(params)).await;
+        assert!(result.is_ok());
+        
+        let call_result = result.unwrap();
+        let content = call_result.content;
+        let json_text = content[0].raw.as_text().unwrap().text.as_str();
+        assert!(json_text.contains("max_num_results must be between"));
+    }
+
+    #[tokio::test]
+    async fn test_get_metrics_from_vector_store_invalid_score_threshold() {
+        let engine = FinanceEngine::new();
+        let params = VectorStoreQueryParams {
+            function_name: "calculate_organic_growth".to_string(),
+            company_name: "Parasol".to_string(),
+            max_num_results: 10,
+            score_threshold: 1.5,  // Invalid: > 1.0
+            ranker: "default".to_string(),
+            rewrite_query: false,
+        };
+        
+        // Set dummy env vars with new structure
+        unsafe {
+            std::env::set_var("VECTOR_STORE_NAME", "rag-store");
+            std::env::set_var("LLAMA_STACK_HOST", "example.com");
+            std::env::set_var("LLAMA_STACK_PORT", "443");
+            std::env::set_var("LLAMA_STACK_SECURE", "true");
+        }
+        
+        let result = engine.get_metrics_from_vector_store(Parameters(params)).await;
+        assert!(result.is_ok());
+        
+        let call_result = result.unwrap();
+        let content = call_result.content;
+        let json_text = content[0].raw.as_text().unwrap().text.as_str();
+        assert!(json_text.contains("score_threshold must be between"));
+    }
+
+    #[test]
+    fn test_generate_query_for_function() {
+        // Test organic growth
+        let query = FinanceEngine::generate_query_for_function("calculate_organic_growth", "Parasol").unwrap();
+        assert!(query.contains("Parasol"));
+        assert!(query.contains("current") || query.contains("revenue"));
+        assert!(query.contains("prior"));
+
+        // Test company health score (now with 3 metrics)
+        let query = FinanceEngine::generate_query_for_function("calculate_company_health_score", "Acme Corp").unwrap();
+        assert!(query.contains("Acme Corp"));
+        assert!(query.contains("revenue growth"));
+        assert!(query.contains("SLA compliance"));
+        assert!(query.contains("customer satisfaction"));
+        // Should NOT contain the removed metrics
+        assert!(!query.contains("modern revenue"));
+        assert!(!query.contains("pipeline coverage"));
+
+        // Test invalid function
+        let result = FinanceEngine::generate_query_for_function("invalid_function", "Company");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unknown function name"));
+    }
+}

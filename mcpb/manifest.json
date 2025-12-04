@@ -13,7 +13,12 @@
     "mcp_config": {
       "command": "${__dirname}/stdio_server",
       "args": [],
-      "env": {}
+      "env": {
+        "VECTOR_STORE_NAME": "rag-store",
+        "LLAMA_STACK_HOST": "llama-stack-demo-route-llama-stack-demo.apps.ocp.sandbox3322.opentlc.com",
+        "LLAMA_STACK_PORT": "443",
+        "LLAMA_STACK_SECURE": "true"
+      }
     }
   },
   "tools_generated": true,
