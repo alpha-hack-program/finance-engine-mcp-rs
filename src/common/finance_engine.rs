@@ -1142,7 +1142,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate comprehensive company health score (0-100) by combining three weighted dimensions: revenue growth (40%), Service Level Agreement compliance (35%), and customer satisfaction (25%). Uses only directly extractable metrics. Returns overall score, individual components, weighted contributions, risk level classification (LOW/MEDIUM/HIGH/CRITICAL), and interpretation.")]
+    #[tool(description = "Calculate comprehensive company health score (0-100) by combining three weighted dimensions: revenue growth (40%), Service Level Agreement compliance (35%), and customer satisfaction (25%). Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from. Returns overall score, individual components, weighted contributions, risk level classification (LOW/MEDIUM/HIGH/CRITICAL), and interpretation.")]
     pub async fn calculate_company_health_score(
         &self,
         Parameters(params): Parameters<CompanyHealthScoreParams>,
@@ -1194,7 +1194,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Evaluate revenue quality and sustainability by categorizing revenue into high-growth (>15% YoY), stable (0-15% YoY), and declining (<0% YoY) segments. Applies quality weights (1.0, 0.7, 0.0) to calculate composite quality score (0.0-1.0). Returns quality score, distribution breakdown, letter grade (A-F), strategic recommendation, and gap to industry benchmark (0.75).")]
+    #[tool(description = "Evaluate revenue quality and sustainability by categorizing revenue into high-growth (>15% YoY), stable (0-15% YoY), and declining (<0% YoY) segments. Applies quality weights (1.0, 0.7, 0.0) to calculate composite quality score (0.0-1.0). Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from. Returns quality score, distribution breakdown, letter grade (A-F), strategic recommendation, and gap to industry benchmark (0.75).")]
     pub async fn calculate_revenue_quality_score(
         &self,
         Parameters(params): Parameters<RevenueQualityScoreParams>,
@@ -1254,7 +1254,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Compute Herfindahl-Hirschman Index (HHI) to measure revenue concentration risk across business segments. HHI is sum of squared market shares (0.0-1.0). Returns HHI, diversification score (1-HHI), effective number of segments (1/HHI), risk classification (LOW <0.15, MEDIUM 0.15-0.25, HIGH >0.25), market shares, largest share, and concentration warnings.")]
+    #[tool(description = "Compute Herfindahl-Hirschman Index (HHI) to measure revenue concentration risk across business segments. HHI is sum of squared market shares (0.0-1.0). Returns HHI, diversification score (1-HHI), effective number of segments (1/HHI), risk classification (LOW <0.15, MEDIUM 0.15-0.25, HIGH >0.25), market shares, largest share, and concentration warnings. Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn calculate_hhi_and_diversification(
         &self,
         Parameters(params): Parameters<HHIParams>,
@@ -1277,7 +1277,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate operating leverage ratio measuring relationship between revenue growth and cost growth to assess operational scalability. Ratio > 1.0 indicates positive operating leverage (revenue growing faster than costs). Returns operating leverage ratio, growth rates, margin expansion in basis points, efficiency rating (Excellent/Good/Adequate/Poor), and interpretation.")]
+    #[tool(description = "Calculate operating leverage ratio measuring relationship between revenue growth and cost growth to assess operational scalability. Ratio > 1.0 indicates positive operating leverage (revenue growing faster than costs). Returns operating leverage ratio, growth rates, margin expansion in basis points, efficiency rating (Excellent/Good/Adequate/Poor), and interpretation. Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn calculate_operating_leverage(
         &self,
         Parameters(params): Parameters<OperatingLeverageParams>,
@@ -1316,7 +1316,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate revenue-weighted portfolio momentum index measuring aggregate growth trajectory across business segments. Computes weighted average growth rate where each segment's contribution is proportional to its revenue share. Returns portfolio momentum (decimal and percentage), total revenue, per-segment contributions, top contributor, and momentum rating (Strong >10%, Moderate 5-10%, Weak 0-5%, Declining <0%).")]
+    #[tool(description = "Calculate revenue-weighted portfolio momentum index measuring aggregate growth trajectory across business segments. Computes weighted average growth rate where each segment's contribution is proportional to its revenue share. Returns portfolio momentum (decimal and percentage), total revenue, per-segment contributions, top contributor, and momentum rating (Strong >10%, Moderate 5-10%, Weak 0-5%, Declining <0%). Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn calculate_portfolio_momentum(
         &self,
         Parameters(params): Parameters<PortfolioMomentumParams>,
@@ -1339,7 +1339,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate Gini coefficient measuring revenue distribution inequality across segments for concentration risk assessment. Gini ranges 0-1 (0=perfect equality, 1=complete inequality). Returns Gini coefficient, diversification score (1-Gini), concentration level (Low <0.25, Moderate 0.25-0.40, High >0.40), largest/smallest segment shares, effective number of segments, and sorted revenues.")]
+    #[tool(description = "Calculate Gini coefficient measuring revenue distribution inequality across segments for concentration risk assessment. Gini ranges 0-1 (0=perfect equality, 1=complete inequality). Returns Gini coefficient, diversification score (1-Gini), concentration level (Low <0.25, Moderate 0.25-0.40, High >0.40), largest/smallest segment shares, effective number of segments, and sorted revenues. Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn calculate_gini_coefficient(
         &self,
         Parameters(params): Parameters<GiniCoefficientParams>,
@@ -1362,7 +1362,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Calculate year-over-year organic revenue growth excluding acquisitions, divestitures, and other inorganic factors. This is the purest measure of underlying business performance. Returns organic growth rate (decimal and percentage), absolute dollar growth, prior/current revenue values, growth rating (Exceptional >15%, Strong 10-15%, Moderate 5-10%, Weak 0-5%, Declining <0%), and annualized CAGR.")]
+    #[tool(description = "Calculate year-over-year organic revenue growth excluding acquisitions, divestitures, and other inorganic factors. This is the purest measure of underlying business performance. Returns organic growth rate (decimal and percentage), absolute dollar growth, prior/current revenue values, growth rating (Exceptional >15%, Strong 10-15%, Moderate 5-10%, Weak 0-5%, Declining <0%), and annualized CAGR. Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn calculate_organic_growth(
         &self,
         Parameters(params): Parameters<OrganicGrowthParams>,
@@ -1401,7 +1401,7 @@ impl FinanceEngine {
         }
     }
 
-    #[tool(description = "Retrieve financial metrics from a vector store for a specific finance calculation function. Automatically generates appropriate queries based on the function name (e.g., 'calculate_organic_growth' generates query for current and prior revenue). Supports all 7 calculation functions. Requires VECTOR_STORE_NAME, LLAMA_STACK_HOST, LLAMA_STACK_PORT, and LLAMA_STACK_SECURE environment variables. Returns an array of matching chunks with content, similarity scores, and metadata.")]
+    #[tool(description = "Retrieve financial metrics from a vector store for a specific finance calculation function. Automatically generates appropriate queries based on the function name (e.g., 'calculate_organic_growth' generates query for current and prior revenue). Supports all 7 calculation functions. Requires VECTOR_STORE_NAME, LLAMA_STACK_HOST, LLAMA_STACK_PORT, and LLAMA_STACK_SECURE environment variables. Returns an array of matching chunks with content, similarity scores, and metadata. Use ALWAYS FIRST function `get_metrics_from_vector_store` to get the financial context to extract metrics from.")]
     pub async fn get_metrics_from_vector_store(
         &self,
         Parameters(params): Parameters<VectorStoreQueryParams>,
