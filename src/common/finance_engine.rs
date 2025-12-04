@@ -1527,7 +1527,7 @@ impl ServerHandler for FinanceEngine {
     fn get_info(&self) -> ServerInfo {
         // Read basic information from .env file (replaced by sync script during release)
         let name = "finance-engine-mcp-rs".to_string();
-        let version = "2.0.1".to_string();
+        let version = "2.0.2".to_string();
         let title = "Finance Engine MCP Server".to_string();
         let website_url = "https://github.com/alpha-hack-program/finance-engine-mcp-rs.git".to_string();
 
