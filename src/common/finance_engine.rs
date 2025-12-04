@@ -367,20 +367,20 @@ pub struct VectorStoreQueryParams {
     pub company_name: String,
     #[schemars(description = "Maximum number of results to return (default: 5)")]
     #[serde(default = "default_max_results")]
-    pub max_num_results: usize,
+    pub max_num_results: Option<usize>,
     #[schemars(description = "Minimum score threshold for results (default: 0.8)")]
-    #[serde(default = "default_score_threshold")]
-    pub score_threshold: f64,
+    #[serde(default = "default_score_threshold_opt")]
+    pub score_threshold: Option<f64>,
     #[schemars(description = "Ranker to use for scoring (default: 'default')")]
-    #[serde(default = "default_ranker")]
-    pub ranker: String,
+    #[serde(default = "default_ranker_opt")]
+    pub ranker: Option<String>,
     #[schemars(description = "Whether to rewrite the query (default: false)")]
-    #[serde(default, deserialize_with = "deserialize_bool_flexible")]
-    pub rewrite_query: bool,
+    #[serde(default, deserialize_with = "deserialize_bool_flexible_opt")]
+    pub rewrite_query: Option<bool>,
 }
 
-/// Custom deserializer that accepts both boolean and string representations
-fn deserialize_bool_flexible<'de, D>(deserializer: D) -> Result<bool, D::Error>
+/// Custom deserializer for optional boolean that accepts both boolean and string representations
+fn deserialize_bool_flexible_opt<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -390,6 +390,65 @@ where
     struct BoolVisitor;
 
     impl<'de> Visitor<'de> for BoolVisitor {
+        type Value = Option<bool>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a boolean or a string representing a boolean")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(InnerBoolVisitor).map(Some)
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Some(value))
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            match value.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(Some(true)),
+                "false" | "0" | "no" => Ok(Some(false)),
+                _ => Err(de::Error::custom(format!(
+                    "invalid boolean string: {}",
+                    value
+                ))),
+            }
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            self.visit_str(&value)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(None)
+        }
+    }
+
+    struct InnerBoolVisitor;
+
+    impl<'de> Visitor<'de> for InnerBoolVisitor {
         type Value = bool;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -425,19 +484,19 @@ where
         }
     }
 
-    deserializer.deserialize_any(BoolVisitor)
+    deserializer.deserialize_option(BoolVisitor)
 }
 
-fn default_max_results() -> usize {
-    5
+fn default_max_results() -> Option<usize> {
+    None
 }
 
-fn default_score_threshold() -> f64 {
-    0.8
+fn default_score_threshold_opt() -> Option<f64> {
+    None
 }
 
-fn default_ranker() -> String {
-    "default".to_string()
+fn default_ranker_opt() -> Option<String> {
+    None
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
@@ -948,17 +1007,19 @@ impl FinanceEngine {
     /// Validate vector store query parameters
     fn validate_vector_store_params(
         function_name: &str,
-        max_num_results: usize,
-        score_threshold: f64,
+        max_num_results: Option<usize>,
+        score_threshold: Option<f64>,
     ) -> Result<(), String> {
         // Validate function name by trying to generate a query
         Self::generate_query_for_function(function_name, "test")?;
 
-        if max_num_results == 0 || max_num_results > 10 {
+        let max_results = max_num_results.unwrap_or(5);
+        if max_results == 0 || max_results > 10 {
             return Err("max_num_results must be between 1 and 10".to_string());
         }
 
-        if score_threshold < 0.0 || score_threshold > 1.0 {
+        let threshold = score_threshold.unwrap_or(0.8);
+        if threshold < 0.0 || threshold > 1.0 {
             return Err("score_threshold must be between 0.0 and 1.0".to_string());
         }
 
@@ -1041,13 +1102,19 @@ impl FinanceEngine {
         vector_store_api_url: String,
         function_name: String,
         company_name: String,
-        max_num_results: usize,
-        score_threshold: f64,
-        ranker: String,
-        rewrite_query: bool,
+        max_num_results: Option<usize>,
+        score_threshold: Option<f64>,
+        ranker: Option<String>,
+        rewrite_query: Option<bool>,
     ) -> Result<VectorStoreQueryResponse, String> {
         // Generate appropriate query based on function name
         let query = Self::generate_query_for_function(&function_name, &company_name)?;
+
+        // Apply defaults for optional parameters
+        let max_results = max_num_results.unwrap_or(5);
+        let threshold = score_threshold.unwrap_or(0.8);
+        let ranker_type = ranker.unwrap_or_else(|| "default".to_string());
+        let rewrite = rewrite_query.unwrap_or(false);
 
         // Log the query using INFO level
         tracing::info!("Generated query: {}", query);
@@ -1063,12 +1130,12 @@ impl FinanceEngine {
         // Prepare request body matching the LlamaStack API format
         let request_body = VectorStoreSearchRequest {
             query: query.clone(),
-            max_num_results,
+            max_num_results: max_results,
             ranking_options: RankingOptions {
-                ranker: ranker.clone(),
-                score_threshold,
+                ranker: ranker_type.clone(),
+                score_threshold: threshold,
             },
-            rewrite_query,
+            rewrite_query: rewrite,
         };
 
         // Log before request using INFO level
@@ -1841,10 +1908,10 @@ mod tests {
         let params = VectorStoreQueryParams {
             function_name: "invalid_function_name".to_string(),
             company_name: "Parasol".to_string(),
-            max_num_results: 5,
-            score_threshold: 0.8,
-            ranker: "default".to_string(),
-            rewrite_query: false,
+            max_num_results: Some(5),
+            score_threshold: Some(0.8),
+            ranker: Some("default".to_string()),
+            rewrite_query: Some(false),
         };
         
         // Set dummy env vars with new structure
@@ -1870,10 +1937,10 @@ mod tests {
         let params = VectorStoreQueryParams {
             function_name: "calculate_organic_growth".to_string(),
             company_name: "Parasol".to_string(),
-            max_num_results: 0,
-            score_threshold: 0.5,
-            ranker: "default".to_string(),
-            rewrite_query: false,
+            max_num_results: Some(0),
+            score_threshold: Some(0.5),
+            ranker: Some("default".to_string()),
+            rewrite_query: Some(false),
         };
         
         // Set dummy env vars with new structure
@@ -1899,10 +1966,10 @@ mod tests {
         let params = VectorStoreQueryParams {
             function_name: "calculate_organic_growth".to_string(),
             company_name: "Parasol".to_string(),
-            max_num_results: 10,
-            score_threshold: 1.5,  // Invalid: > 1.0
-            ranker: "default".to_string(),
-            rewrite_query: false,
+            max_num_results: Some(10),
+            score_threshold: Some(1.5),  // Invalid: > 1.0
+            ranker: Some("default".to_string()),
+            rewrite_query: Some(false),
         };
         
         // Set dummy env vars with new structure
@@ -1936,7 +2003,7 @@ mod tests {
         
         let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_true);
         assert!(params.is_ok());
-        assert_eq!(params.unwrap().rewrite_query, true);
+        assert_eq!(params.unwrap().rewrite_query, Some(true));
         
         let json_false = r#"{
             "function_name": "calculate_organic_growth",
@@ -1949,7 +2016,7 @@ mod tests {
         
         let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_false);
         assert!(params.is_ok());
-        assert_eq!(params.unwrap().rewrite_query, false);
+        assert_eq!(params.unwrap().rewrite_query, Some(false));
     }
 
     #[test]
@@ -1966,7 +2033,7 @@ mod tests {
         
         let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_true);
         assert!(params.is_ok());
-        assert_eq!(params.unwrap().rewrite_query, true);
+        assert_eq!(params.unwrap().rewrite_query, Some(true));
         
         let json_false = r#"{
             "function_name": "calculate_organic_growth",
@@ -1979,19 +2046,19 @@ mod tests {
         
         let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_false);
         assert!(params.is_ok());
-        assert_eq!(params.unwrap().rewrite_query, false);
+        assert_eq!(params.unwrap().rewrite_query, Some(false));
     }
 
     #[test]
     fn test_flexible_bool_deserializer_variations() {
         // Test various string representations of boolean values
         let variations = vec![
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"1"}"#, true),
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"0"}"#, false),
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"yes"}"#, true),
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"no"}"#, false),
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"TRUE"}"#, true),
-            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"FALSE"}"#, false),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"1"}"#, Some(true)),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"0"}"#, Some(false)),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"yes"}"#, Some(true)),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"no"}"#, Some(false)),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"TRUE"}"#, Some(true)),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"FALSE"}"#, Some(false)),
         ];
         
         for (json, expected) in variations {
@@ -1999,6 +2066,23 @@ mod tests {
             assert!(params.is_ok(), "Failed to parse: {}", json);
             assert_eq!(params.unwrap().rewrite_query, expected, "Wrong value for: {}", json);
         }
+    }
+
+    #[test]
+    fn test_flexible_bool_deserializer_omitted() {
+        // Test that rewrite_query can be omitted and defaults to None
+        let json = r#"{
+            "function_name": "calculate_organic_growth",
+            "company_name": "Parasol"
+        }"#;
+        
+        let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json);
+        assert!(params.is_ok());
+        let parsed = params.unwrap();
+        assert_eq!(parsed.rewrite_query, None);
+        assert_eq!(parsed.max_num_results, None);
+        assert_eq!(parsed.score_threshold, None);
+        assert_eq!(parsed.ranker, None);
     }
 
 
