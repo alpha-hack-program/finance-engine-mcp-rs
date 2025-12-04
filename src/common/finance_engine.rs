@@ -375,8 +375,57 @@ pub struct VectorStoreQueryParams {
     #[serde(default = "default_ranker")]
     pub ranker: String,
     #[schemars(description = "Whether to rewrite the query (default: false)")]
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_bool_flexible")]
     pub rewrite_query: bool,
+}
+
+/// Custom deserializer that accepts both boolean and string representations
+fn deserialize_bool_flexible<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Visitor};
+    use std::fmt;
+
+    struct BoolVisitor;
+
+    impl<'de> Visitor<'de> for BoolVisitor {
+        type Value = bool;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a boolean or a string representing a boolean")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            match value.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(true),
+                "false" | "0" | "no" => Ok(false),
+                _ => Err(de::Error::custom(format!(
+                    "invalid boolean string: {}",
+                    value
+                ))),
+            }
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            self.visit_str(&value)
+        }
+    }
+
+    deserializer.deserialize_any(BoolVisitor)
 }
 
 fn default_max_results() -> usize {
@@ -1872,6 +1921,86 @@ mod tests {
         let json_text = content[0].raw.as_text().unwrap().text.as_str();
         assert!(json_text.contains("score_threshold must be between"));
     }
+
+    #[test]
+    fn test_flexible_bool_deserializer_from_string() {
+        // Test that rewrite_query accepts string values "true" and "false"
+        let json_true = r#"{
+            "function_name": "calculate_organic_growth",
+            "company_name": "Parasol",
+            "max_num_results": 5,
+            "score_threshold": 0.8,
+            "ranker": "default",
+            "rewrite_query": "true"
+        }"#;
+        
+        let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_true);
+        assert!(params.is_ok());
+        assert_eq!(params.unwrap().rewrite_query, true);
+        
+        let json_false = r#"{
+            "function_name": "calculate_organic_growth",
+            "company_name": "Parasol",
+            "max_num_results": 5,
+            "score_threshold": 0.8,
+            "ranker": "default",
+            "rewrite_query": "false"
+        }"#;
+        
+        let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_false);
+        assert!(params.is_ok());
+        assert_eq!(params.unwrap().rewrite_query, false);
+    }
+
+    #[test]
+    fn test_flexible_bool_deserializer_from_boolean() {
+        // Test that rewrite_query still accepts actual boolean values
+        let json_true = r#"{
+            "function_name": "calculate_organic_growth",
+            "company_name": "Parasol",
+            "max_num_results": 5,
+            "score_threshold": 0.8,
+            "ranker": "default",
+            "rewrite_query": true
+        }"#;
+        
+        let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_true);
+        assert!(params.is_ok());
+        assert_eq!(params.unwrap().rewrite_query, true);
+        
+        let json_false = r#"{
+            "function_name": "calculate_organic_growth",
+            "company_name": "Parasol",
+            "max_num_results": 5,
+            "score_threshold": 0.8,
+            "ranker": "default",
+            "rewrite_query": false
+        }"#;
+        
+        let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json_false);
+        assert!(params.is_ok());
+        assert_eq!(params.unwrap().rewrite_query, false);
+    }
+
+    #[test]
+    fn test_flexible_bool_deserializer_variations() {
+        // Test various string representations of boolean values
+        let variations = vec![
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"1"}"#, true),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"0"}"#, false),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"yes"}"#, true),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"no"}"#, false),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"TRUE"}"#, true),
+            (r#"{"function_name":"test","company_name":"Test","max_num_results":5,"score_threshold":0.8,"ranker":"default","rewrite_query":"FALSE"}"#, false),
+        ];
+        
+        for (json, expected) in variations {
+            let params: Result<VectorStoreQueryParams, _> = serde_json::from_str(json);
+            assert!(params.is_ok(), "Failed to parse: {}", json);
+            assert_eq!(params.unwrap().rewrite_query, expected, "Wrong value for: {}", json);
+        }
+    }
+
 
     #[test]
     fn test_generate_query_for_function() {
