@@ -6,16 +6,12 @@ all: build-all
 build-mcp:
 	cargo build --release --bin mcp_server
 
-# Build SSE server (sse)
-build-sse:
-	cargo build --release --bin sse_server
-
 # Build stdio server (stdio)
 build-stdio:
 	cargo build --release --bin stdio_server
 
 # Build all servers
-build-all: build-mcp build-sse build-stdio
+build-all: build-mcp build-stdio
 
 # Pack MCP server for Claude Desktop
 pack: build-stdio
@@ -34,12 +30,6 @@ image-push:
 # Run image
 image-run:
 	scripts/image.sh run
-
-# Test SSE server locally
-test-sse: build-sse
-	@echo "🧪 Testing SSE server..."
-	@echo ""
-	RUST_LOG=debug BIND_ADDRESS=0.0.0.0:8002 ./target/release/sse_server
 
 # Test MCP server locally
 test-mcp: build-mcp
