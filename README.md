@@ -45,7 +45,7 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 - **Vector Store Integration**: Query financial metrics using OpenAI's vector store API
 - **Explicit Multi-Step Logic**: All calculations transparent and verifiable
 - **Robust Input Validation**: JSON schema validation with detailed error handling
-- **Multiple Transport Protocols**: STDIO, SSE, and Streamable HTTP
+- **Multiple Transport Protocols**: STDIO, and Streamable HTTP
 - **Containerization**: Production-ready Podman/Docker setup
 - **Claude Desktop Integration**: MCPB packaging for seamless integration
 - **Professional Metrics**: Prometheus metrics for monitoring
@@ -56,7 +56,6 @@ The Finance Engine MCP Server provides sophisticated financial metrics calculati
 | Task | Command | Description |
 |------|---------|-------------|
 | **🧪 Test** | `make test` | Run all tests |
-| **🧪 Test SSE** | `make test-sse` | Run MCP server with SSE transport |
 | **🧪 Test MCP** | `make test-mcp` | Run MCP server with Streamable HTTP transport |
 | **🚀 Release** | `make release-patch` | Create new patch release |
 | **📦 Package** | `make pack` | Create Claude Desktop package |
@@ -421,7 +420,6 @@ cd finance-engine-mcp-rs
 make build-all
 
 # Or build individually
-make build-sse      # SSE Server
 make build-mcp      # MCP HTTP Server
 make build-stdio    # STDIO Server for Claude
 ```
@@ -435,25 +433,22 @@ make test
 
 ### 🏃‍♂️ Running
 
-> **NOTE:** By default `BIND_ADDRESS=127.0.0.1:8000` for **SSE** and `BIND_ADDRESS=127.0.0.1:8001` for **Streamable HTTP**
+> **NOTE:** By default `BIND_ADDRESS=127.0.0.1:8001` for **Streamable HTTP**
 
 ```bash
-# SSE Server
-make test-sse
-
 # MCP Streamable HTTP Server
 make test-mcp
 
 # Or directly with custom address
-RUST_LOG=info BIND_ADDRESS=127.0.0.1:8002 ./target/release/sse_server
+RUST_LOG=info BIND_ADDRESS=127.0.0.1:8001 ./target/release/mcp_server
 ```
 
 ### 🧪 Testing With MCP Inspector
 
-Run the MCP server with SSE transport:
+Run the MCP server with StreamableHTTP transport:
 
 ```bash
-make test-sse
+make test-mcp
 ```
 
 In another terminal, run MCP inspector:
@@ -463,8 +458,8 @@ make inspector
 ```
 
 Open the URL provided in your browser and:
-1. Set **Transport Type:** `SSE`
-2. Set **URL:** `http://localhost:8002/sse`
+1. Set **Transport Type:** `StreamableHTTP`
+2. Set **URL:** `http://localhost:8002/mcp`
 3. Click `Connect`
 4. Click `List Tools` to see all seven functions
 5. Select any function, fill parameters, and click `Run tool`
@@ -554,7 +549,6 @@ podman run -p 8001:8001 \
 ```bash
 make build-all              # Build all servers
 make build-mcp              # Build MCP server
-make build-sse              # Build SSE server
 make build-stdio            # Build stdio server
 make pack                   # Pack for Claude Desktop
 ```
@@ -571,7 +565,6 @@ make sync-version           # Manually sync version
 #### 🧪 Test Commands
 ```bash
 make test                   # Run all tests
-make test-sse               # Test SSE server
 make test-mcp               # Test MCP server
 ```
 
@@ -589,7 +582,6 @@ make help                   # Show all commands
 │   │   ├── finance_engine.rs              # Core financial logic
 │   │   ├── metrics.rs                     # Prometheus metrics
 │   │   └── mod.rs
-│   ├── sse_server.rs                      # SSE Server
 │   ├── mcp_server.rs                      # MCP HTTP Server
 │   └── stdio_server.rs                    # STDIO Server
 ├── scripts/                               # Utility scripts
