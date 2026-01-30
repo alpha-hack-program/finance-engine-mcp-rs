@@ -1,5 +1,5 @@
 use rmcp::transport::streamable_http_server::{
-    StreamableHttpService, session::local::LocalSessionManager,
+    StreamableHttpService, session::local::LocalSessionManager, StreamableHttpServerConfig,
 };
 use tracing_subscriber::{
     layer::SubscriberExt,
@@ -80,7 +80,10 @@ async fn main() -> anyhow::Result<()> {
     let service = StreamableHttpService::new(
         || Ok(FinanceEngine::new()),
         LocalSessionManager::default().into(),
-        Default::default(),
+        StreamableHttpServerConfig {
+            sse_retry: None,
+            ..Default::default()
+        },
     );
 
     // Create router with the MCP service at root

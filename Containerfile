@@ -7,7 +7,7 @@ ARG VERSION=3.1.1
 ARG MAINTAINER="Alpha Hack Group <alpha@github.com>"
 ARG DESCRIPTION="Finance Engine MCP Server - Model Context Protocol server to check benefits"
 ARG APP_NAME=finance-engine-mcp-rs
-ARG PORT=8001
+ARG PORT=8000
 ARG SOURCE=https://github.com/alpha-hack-program/finance-engine-mcp-rs.git
 
 # Multi-stage build
